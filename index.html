@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Greenland Battle</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #222;
+            font-family: Arial, sans-serif;
+        }
+
+        #gameContainer {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background: linear-gradient(135deg, #2d5016 0%, #1a2e0a 100%);
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            font-size: 18px;
+            z-index: 100;
+        }
+
+        #stats {
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 8px;
+            line-height: 1.8;
+        }
+
+        #shopButton {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            padding: 15px 30px;
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            z-index: 100;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        #shopButton:hover {
+            transform: scale(1.05);
+            box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
+        }
+
+        #shopButton:active {
+            transform: scale(0.98);
+        }
+
+        #shopModal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 200;
+            overflow-y: auto;
+        }
+
+        #shopContent {
+            background: rgba(50, 50, 50, 0.95);
+            margin: 20px auto;
+            padding: 30px;
+            max-width: 600px;
+            border-radius: 12px;
+            color: white;
+            border: 2px solid #4CAF50;
+        }
+
+        #shopContent h2 {
+            margin-bottom: 20px;
+            color: #4CAF50;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+
+        .shop-section {
+            margin-bottom: 25px;
+        }
+
+        .shop-section h3 {
+            color: #4CAF50;
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+
+        .shop-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background: rgba(100, 100, 100, 0.5);
+            margin-bottom: 10px;
+            border-radius: 6px;
+            border-left: 3px solid #4CAF50;
+        }
+
+        .shop-item button {
+            padding: 8px 15px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .shop-item button:hover {
+            background: #45a049;
+        }
+
+        .shop-item button:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+
+        #closeShop {
+            margin-top: 20px;
+            padding: 12px 30px;
+            background: #666;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            width: 100%;
+        }
+
+        #closeShop:hover {
+            background: #555;
+        }
+
+        #joystick {
+            position: absolute;
+            bottom: 30px;
+            left: 30px;
+            width: 120px;
+            height: 120px;
+            background: rgba(100, 100, 100, 0.5);
+            border: 3px solid rgba(200, 200, 200, 0.7);
+            border-radius: 50%;
+            display: none;
+            z-index: 150;
+        }
+
+        #joystick.active {
+            display: block;
+        }
+
+        #joystickHandle {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            background: rgba(76, 175, 80, 0.8);
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            border: 2px solid rgba(200, 200, 200, 0.9);
+        }
+
+        @media (max-width: 768px) {
+            #joystick.active {
+                display: block;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+        <div id="ui">
+            <div id="stats">
+                <div>Round: <span id="roundNum">0</span></div>
+                <div>Health: <span id="playerHealth">100</span>/<span id="playerMaxHealth">100</span></div>
+                <div>Coins: <span id="coins">0</span></div>
+                <div>Enemies: <span id="enemyCount">0</span></div>
+                <div>Tower Health: <span id="towerHealth">1000</span>/1000</div>
+            </div>
+        </div>
+        <button id="shopButton">SHOP</button>
+        <div id="shopModal">
+            <div id="shopContent">
+                <h2>⚔️ SHOP</h2>
+                
+                <div class="shop-section">
+                    <h3>💰 Upgrades</h3>
+                    <div class="shop-item">
+                        <span>Max Health: <strong id="maxHealthLevel">Lv.1</strong></span>
+                        <button onclick="game.upgrades.upgradeMaxHealth()">Cost: <span id="maxHealthCost">100</span></button>
+                    </div>
+                    <div class="shop-item">
+                        <span>Melee Damage: <strong id="meleeDamageLevel">Lv.1</strong></span>
+                        <button onclick="game.upgrades.upgradeMeleeDamage()">Cost: <span id="meleeDamageCost">100</span></button>
+                    </div>
+                    <div class="shop-item">
+                        <span>Ranged Damage: <strong id="rangedDamageLevel">Lv.1</strong></span>
+                        <button onclick="game.upgrades.upgradeRangedDamage()">Cost: <span id="rangedDamageCost">100</span></button>
+                    </div>
+                </div>
+
+                <div class="shop-section">
+                    <h3>🗡️ Weapons (Choose up to 3)</h3>
+                    <div class="shop-item">
+                        <span>Sword (15-20 melee)</span>
+                        <button id="swordBtn" onclick="game.upgradeManager.toggleWeapon('sword')">Select</button>
+                    </div>
+                    <div class="shop-item">
+                        <span>Bow (10-15 ranged)</span>
+                        <button id="bowBtn" onclick="game.upgradeManager.toggleWeapon('bow')">Select</button>
+                    </div>
+                    <div class="shop-item">
+                        <span>Spear (12-16 melee, longer range)</span>
+                        <button id="spearBtn" onclick="game.upgradeManager.toggleWeapon('spear')">Select</button>
+                    </div>
+                    <div class="shop-item">
+                        <span>Battle Axe (18-25 melee, slow)</span>
+                        <button id="battleAxeBtn" onclick="game.upgradeManager.toggleWeapon('battleAxe')">Select</button>
+                    </div>
+                    <div class="shop-item">
+                        <span>Crossbow (13-18 ranged, slow)</span>
+                        <button id="crossbowBtn" onclick="game.upgradeManager.toggleWeapon('crossbow')">Select</button>
+                    </div>
+                </div>
+
+                <div class="shop-section">
+                    <h3>👥 Ally Troops (Spawn at top middle)</h3>
+                    <div class="shop-item">
+                        <span>Swordman Ally: <strong id="swordmanAllyLevel">Lv.0</strong></span>
+                        <button onclick="game.upgradeManager.unlockAlly('swordmanAlly')">Cost: <span id="swordmanAllyCost">200</span></button>
+                    </div>
+                    <div class="shop-item">
+                        <span>Archer Ally: <strong id="archerAllyLevel">Lv.0</strong></span>
+                        <button onclick="game.upgradeManager.unlockAlly('archerAlly')">Cost: <span id="archerAllyCost">250</span></button>
+                    </div>
+                    <div class="shop-item">
+                        <span>Healer Ally: <strong id="healerAllyLevel">Lv.0</strong></span>
+                        <button onclick="game.upgradeManager.unlockAlly('healerAlly')">Cost: <span id="healerAllyCost">300</span></button>
+                    </div>
+                </div>
+
+                <button id="closeShop" onclick="game.closeShop()">CLOSE</button>
+            </div>
+        </div>
+        <div id="joystick">
+            <div id="joystickHandle"></div>
+        </div>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+</html>
