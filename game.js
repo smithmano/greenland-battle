@@ -263,24 +263,24 @@ class Enemy {
         const multiplier = 1 + (this.round - 1) * 0.08;
         
         const baseStats = {
-            swordman: { health: 100, minDamage: 10, maxDamage: 14, speed: 2, range: 40, special: 'melee' },
-            archer: { health: 80, minDamage: 7, maxDamage: 12, speed: 2, range: 180, special: 'ranged' },
-            shieldmen: { health: 85, minDamage: 3, maxDamage: 4, shieldHealth: 80, speed: 1.5, range: 40, special: 'shield' },
-            rusher: { health: 50, minDamage: 7, maxDamage: 9, speed: 3, range: 40, special: 'rusher', towerDamageMultiplier: 4 },
-            spearman: { health: 115, minDamage: 9, maxDamage: 12, speed: 1.8, range: 60, special: 'melee' },
-            fireman: { health: 65, minDamage: 10, maxDamage: 13, speed: 2.2, range: 150, special: 'fire', burnDamage: 1, burnDuration: 4000 },
-            assassin: { health: 70, minDamage: 30, maxDamage: 13, speed: 2, range: 40, special: 'assassin', firstHit: 30, normalDamage: 10, towerDamageMultiplier: 3 },
-            bomber: { health: 30, minDamage: 0, maxDamage: 0, speed: 2.2, range: 40, special: 'bomber', explodeDamage: 130, explodeRange: 100 },
-            maceman: { health: 140, minDamage: 13, maxDamage: 19, speed: 1.5, range: 40, special: 'maceman' },
-            healer: { health: 60, minDamage: 5, maxDamage: 5, speed: 2, range: 150, special: 'healer', healAmount: 5 },
-            flagguy: { health: 90, minDamage: 0, maxDamage: 0, speed: 2.2, range: 150, special: 'flagguy', speedBoost: 3 },
-            knight: { health: 150, minDamage: 13, maxDamage: 17, shieldHealth: 135, speed: 1.8, range: 40, special: 'knight', rushRange: 100, stun: 0.5 },
-            longswordman: { health: 100, minDamage: 12, maxDamage: 16, shieldHealth: 15, speed: 2, range: 70, special: 'melee' },
-            axeman: { health: 95, minDamage: 14, maxDamage: 18, speed: 2.2, range: 40, special: 'axeman' },
-            crossbowmen: { health: 90, minDamage: 11, maxDamage: 13, speed: 1.5, range: 200, special: 'ranged' },
-            horseknight: { health: 125, minDamage: 18, maxDamage: 22, shieldHealth: 150, speed: 2.5, range: 40, special: 'horseknight' },
-            magician: { health: 70, minDamage: 4, maxDamage: 8, speed: 1.8, range: 180, special: 'magician', stun: 0.8 },
-            giant: { health: 400, minDamage: 45, maxDamage: 55, speed: 1.2, range: 60, special: 'giant' }
+            swordman: { health: 100, minDamage: 10, maxDamage: 14, speed: 0.8, range: 40, special: 'melee' },
+            archer: { health: 80, minDamage: 7, maxDamage: 12, speed: 0.8, range: 180, special: 'ranged' },
+            shieldmen: { health: 85, minDamage: 3, maxDamage: 4, shieldHealth: 80, speed: 0.6, range: 40, special: 'shield' },
+            rusher: { health: 50, minDamage: 7, maxDamage: 9, speed: 1.2, range: 40, special: 'rusher', towerDamageMultiplier: 4 },
+            spearman: { health: 115, minDamage: 9, maxDamage: 12, speed: 0.7, range: 60, special: 'melee' },
+            fireman: { health: 65, minDamage: 10, maxDamage: 13, speed: 0.9, range: 150, special: 'fire', burnDamage: 1, burnDuration: 4000 },
+            assassin: { health: 70, minDamage: 30, maxDamage: 13, speed: 0.8, range: 40, special: 'assassin', firstHit: 30, normalDamage: 10, towerDamageMultiplier: 3 },
+            bomber: { health: 30, minDamage: 0, maxDamage: 0, speed: 0.9, range: 40, special: 'bomber', explodeDamage: 130, explodeRange: 100 },
+            maceman: { health: 140, minDamage: 13, maxDamage: 19, speed: 0.6, range: 40, special: 'maceman' },
+            healer: { health: 60, minDamage: 5, maxDamage: 5, speed: 0.8, range: 150, special: 'healer', healAmount: 5 },
+            flagguy: { health: 90, minDamage: 0, maxDamage: 0, speed: 0.9, range: 150, special: 'flagguy', speedBoost: 3 },
+            knight: { health: 150, minDamage: 13, maxDamage: 17, shieldHealth: 135, speed: 0.7, range: 40, special: 'knight', rushRange: 100, stun: 0.5 },
+            longswordman: { health: 100, minDamage: 12, maxDamage: 16, shieldHealth: 15, speed: 0.8, range: 70, special: 'melee' },
+            axeman: { health: 95, minDamage: 14, maxDamage: 18, speed: 0.9, range: 40, special: 'axeman' },
+            crossbowmen: { health: 90, minDamage: 11, maxDamage: 13, speed: 0.6, range: 200, special: 'ranged' },
+            horseknight: { health: 125, minDamage: 18, maxDamage: 22, shieldHealth: 150, speed: 1.0, range: 40, special: 'horseknight' },
+            magician: { health: 70, minDamage: 4, maxDamage: 8, speed: 0.7, range: 180, special: 'magician', stun: 0.8 },
+            giant: { health: 400, minDamage: 45, maxDamage: 55, speed: 0.5, range: 60, special: 'giant' }
         };
         
         const stats = baseStats[this.type] || baseStats.swordman;
