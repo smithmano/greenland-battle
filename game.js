@@ -18,6 +18,7 @@ const game = {
     keys: {},
     mousePos: { x: 0, y: 0 },
     camera: { x: 0, y: 0 },
+    animationFrame: 0,
     
     upgrades: {
         maxHealthLevel: 1,
@@ -100,6 +101,35 @@ const game = {
     }
 };
 
+// Particle system for visual effects
+class Particle {
+    constructor(x, y, vx, vy, color, life) {
+        this.x = x;
+        this.y = y;
+        this.vx = vx;
+        this.vy = vy;
+        this.color = color;
+        this.life = life;
+        this.maxLife = life;
+    }
+    
+    update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.vy += 0.1; // gravity
+        this.life--;
+    }
+    
+    draw() {
+        ctx.globalAlpha = this.life / this.maxLife;
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+    }
+}
+
 class Player {
     constructor(x, y) {
         this.x = x;
@@ -123,6 +153,7 @@ class Player {
         this.attackCooldown = 0;
         this.attackRange = 40;
         this.currentWeapon = 'sword';
+        this.animationCounter = 0;
     }
     
     update() {
@@ -163,6 +194,8 @@ class Player {
         if (this.attackCooldown > 0) {
             this.attackCooldown -= 16;
         }
+        
+        this.animationCounter++;
     }
     
     takeDamage(amount) {
@@ -170,6 +203,14 @@ class Player {
         this.lastHitTime = Date.now();
         this.isRed = true;
         this.redTimer = 100;
+        
+        // Create damage particles
+        for (let i = 0; i < 5; i++) {
+            const angle = (Math.PI * 2 * i) / 5;
+            const vx = Math.cos(angle) * 3;
+            const vy = Math.sin(angle) * 3;
+            game.particles.push(new Particle(this.x, this.y, vx, vy, '#FF0000', 30));
+        }
         
         if (this.health <= 0) {
             this.die();
@@ -189,15 +230,49 @@ class Player {
     }
     
     draw() {
-        const color = this.isRed ? this.damageColor : this.color;
-        ctx.fillStyle = color;
-        ctx.fillRect(this.x - this.width / 2, this.y - this.height / 2, this.width, this.height);
+        if (this.isDead) {
+            ctx.globalAlpha = 0.5;
+        }
         
+        const color = this.isRed ? this.damageColor : this.color;
+        
+        // Draw body
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.width / 2, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Draw eyes
+        ctx.fillStyle = '#000000';
+        ctx.beginPath();
+        ctx.arc(this.x - 8, this.y - 5, 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(this.x + 8, this.y - 5, 3, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Draw mouth
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y + 3, 5, 0, Math.PI);
+        ctx.stroke();
+        
+        // Draw weapon indicator
+        ctx.strokeStyle = '#FFFF00';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.width / 2 + 5, 0, Math.PI * 2);
+        ctx.stroke();
+        
+        // Draw health bar
         ctx.fillStyle = '#FF0000';
-        ctx.fillRect(this.x - this.width / 2, this.y - this.height / 2 - 10, this.width, 5);
+        ctx.fillRect(this.x - this.width / 2, this.y - this.height / 2 - 15, this.width, 4);
         ctx.fillStyle = '#00FF00';
         const healthPercent = this.health / this.maxHealth;
-        ctx.fillRect(this.x - this.width / 2, this.y - this.height / 2 - 10, this.width * healthPercent, 5);
+        ctx.fillRect(this.x - this.width / 2, this.y - this.height / 2 - 15, this.width * healthPercent, 4);
+        
+        ctx.globalAlpha = 1;
     }
     
     attack(enemies) {
@@ -255,6 +330,7 @@ class Enemy {
         this.attackCooldown = 0;
         this.isBoss = false;
         this.auraAlpha = 0;
+        this.animationCounter = 0;
         
         this.initializeStats();
     }
@@ -263,24 +339,24 @@ class Enemy {
         const multiplier = 1 + (this.round - 1) * 0.08;
         
         const baseStats = {
-            swordman: { health: 100, minDamage: 10, maxDamage: 14, speed: 0.8, range: 40, special: 'melee' },
-            archer: { health: 80, minDamage: 7, maxDamage: 12, speed: 0.8, range: 180, special: 'ranged' },
-            shieldmen: { health: 85, minDamage: 3, maxDamage: 4, shieldHealth: 80, speed: 0.6, range: 40, special: 'shield' },
-            rusher: { health: 50, minDamage: 7, maxDamage: 9, speed: 1.2, range: 40, special: 'rusher', towerDamageMultiplier: 4 },
-            spearman: { health: 115, minDamage: 9, maxDamage: 12, speed: 0.7, range: 60, special: 'melee' },
-            fireman: { health: 65, minDamage: 10, maxDamage: 13, speed: 0.9, range: 150, special: 'fire', burnDamage: 1, burnDuration: 4000 },
-            assassin: { health: 70, minDamage: 30, maxDamage: 13, speed: 0.8, range: 40, special: 'assassin', firstHit: 30, normalDamage: 10, towerDamageMultiplier: 3 },
-            bomber: { health: 30, minDamage: 0, maxDamage: 0, speed: 0.9, range: 40, special: 'bomber', explodeDamage: 130, explodeRange: 100 },
-            maceman: { health: 140, minDamage: 13, maxDamage: 19, speed: 0.6, range: 40, special: 'maceman' },
-            healer: { health: 60, minDamage: 5, maxDamage: 5, speed: 0.8, range: 150, special: 'healer', healAmount: 5 },
-            flagguy: { health: 90, minDamage: 0, maxDamage: 0, speed: 0.9, range: 150, special: 'flagguy', speedBoost: 3 },
-            knight: { health: 150, minDamage: 13, maxDamage: 17, shieldHealth: 135, speed: 0.7, range: 40, special: 'knight', rushRange: 100, stun: 0.5 },
-            longswordman: { health: 100, minDamage: 12, maxDamage: 16, shieldHealth: 15, speed: 0.8, range: 70, special: 'melee' },
-            axeman: { health: 95, minDamage: 14, maxDamage: 18, speed: 0.9, range: 40, special: 'axeman' },
-            crossbowmen: { health: 90, minDamage: 11, maxDamage: 13, speed: 0.6, range: 200, special: 'ranged' },
-            horseknight: { health: 125, minDamage: 18, maxDamage: 22, shieldHealth: 150, speed: 1.0, range: 40, special: 'horseknight' },
-            magician: { health: 70, minDamage: 4, maxDamage: 8, speed: 0.7, range: 180, special: 'magician', stun: 0.8 },
-            giant: { health: 400, minDamage: 45, maxDamage: 55, speed: 0.5, range: 60, special: 'giant' }
+            swordman: { health: 100, minDamage: 10, maxDamage: 14, speed: 0.8, range: 40, special: 'melee', color: '#FF4444' },
+            archer: { health: 80, minDamage: 7, maxDamage: 12, speed: 0.8, range: 180, special: 'ranged', color: '#FF6633' },
+            shieldmen: { health: 85, minDamage: 3, maxDamage: 4, shieldHealth: 80, speed: 0.6, range: 40, special: 'shield', color: '#FF9944' },
+            rusher: { health: 50, minDamage: 7, maxDamage: 9, speed: 1.2, range: 40, special: 'rusher', towerDamageMultiplier: 4, color: '#FF2222' },
+            spearman: { health: 115, minDamage: 9, maxDamage: 12, speed: 0.7, range: 60, special: 'melee', color: '#FF5555' },
+            fireman: { health: 65, minDamage: 10, maxDamage: 13, speed: 0.9, range: 150, special: 'fire', burnDamage: 1, burnDuration: 4000, color: '#FF8800' },
+            assassin: { health: 70, minDamage: 30, maxDamage: 13, speed: 0.8, range: 40, special: 'assassin', firstHit: 30, normalDamage: 10, towerDamageMultiplier: 3, color: '#330033' },
+            bomber: { health: 30, minDamage: 0, maxDamage: 0, speed: 0.9, range: 40, special: 'bomber', explodeDamage: 130, explodeRange: 100, color: '#CC3300' },
+            maceman: { health: 140, minDamage: 13, maxDamage: 19, speed: 0.6, range: 40, special: 'maceman', color: '#DD4444' },
+            healer: { health: 60, minDamage: 5, maxDamage: 5, speed: 0.8, range: 150, special: 'healer', healAmount: 5, color: '#FF0099' },
+            flagguy: { health: 90, minDamage: 0, maxDamage: 0, speed: 0.9, range: 150, special: 'flagguy', speedBoost: 3, color: '#FF1111' },
+            knight: { health: 150, minDamage: 13, maxDamage: 17, shieldHealth: 135, speed: 0.7, range: 40, special: 'knight', rushRange: 100, stun: 0.5, color: '#FF7777' },
+            longswordman: { health: 100, minDamage: 12, maxDamage: 16, shieldHealth: 15, speed: 0.8, range: 70, special: 'melee', color: '#FF5555' },
+            axeman: { health: 95, minDamage: 14, maxDamage: 18, speed: 0.9, range: 40, special: 'axeman', color: '#CC2222' },
+            crossbowmen: { health: 90, minDamage: 11, maxDamage: 13, speed: 0.6, range: 200, special: 'ranged', color: '#FF8844' },
+            horseknight: { health: 125, minDamage: 18, maxDamage: 22, shieldHealth: 150, speed: 1.0, range: 40, special: 'horseknight', color: '#FF6666' },
+            magician: { health: 70, minDamage: 4, maxDamage: 8, speed: 0.7, range: 180, special: 'magician', stun: 0.8, color: '#9933FF' },
+            giant: { health: 400, minDamage: 45, maxDamage: 55, speed: 0.5, range: 60, special: 'giant', color: '#CC0000' }
         };
         
         const stats = baseStats[this.type] || baseStats.swordman;
@@ -291,6 +367,7 @@ class Enemy {
         this.speed = stats.speed;
         this.range = stats.range;
         this.special = stats.special;
+        this.color = stats.color;
         
         if (stats.shieldHealth) {
             this.shieldHealth = Math.floor(stats.shieldHealth * multiplier);
@@ -298,7 +375,7 @@ class Enemy {
         }
         
         Object.keys(stats).forEach(key => {
-            if (key !== 'health' && key !== 'minDamage' && key !== 'maxDamage' && key !== 'speed' && key !== 'range' && key !== 'special' && key !== 'shieldHealth') {
+            if (key !== 'health' && key !== 'minDamage' && key !== 'maxDamage' && key !== 'speed' && key !== 'range' && key !== 'special' && key !== 'shieldHealth' && key !== 'color') {
                 this[key] = stats[key];
             }
         });
@@ -340,6 +417,8 @@ class Enemy {
         if (this.attackCooldown > 0) {
             this.attackCooldown -= 16;
         }
+        
+        this.animationCounter++;
     }
     
     attack(target) {
@@ -371,6 +450,14 @@ class Enemy {
             this.health -= amount;
         }
         
+        // Create damage particles
+        for (let i = 0; i < 3; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const vx = Math.cos(angle) * 2;
+            const vy = Math.sin(angle) * 2;
+            game.particles.push(new Particle(this.x, this.y, vx, vy, '#FFAA00', 20));
+        }
+        
         if (this.health <= 0) {
             this.die();
         }
@@ -378,27 +465,60 @@ class Enemy {
     
     die() {
         game.coins += 10;
+        
+        // Create death particles
+        for (let i = 0; i < 10; i++) {
+            const angle = (Math.PI * 2 * i) / 10;
+            const vx = Math.cos(angle) * 4;
+            const vy = Math.sin(angle) * 4;
+            game.particles.push(new Particle(this.x, this.y, vx, vy, this.color, 40));
+        }
+        
         game.enemies = game.enemies.filter(e => e !== this);
     }
     
     draw() {
+        // Draw body
         ctx.fillStyle = this.color;
-        ctx.fillRect(this.x - this.width / 2, this.y - this.height / 2, this.width, this.height);
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.width / 2, 0, Math.PI * 2);
+        ctx.fill();
         
-        if (this.shieldHealth && this.shieldHealth > 0) {
-            ctx.fillStyle = '#FFFF00';
-            const shieldPercent = this.shieldHealth / this.maxShieldHealth;
-            ctx.fillRect(this.x - this.width / 2, this.y - this.height / 2 - 15, this.width * shieldPercent, 3);
+        // Draw eyes based on type
+        ctx.fillStyle = '#FFFF00';
+        ctx.beginPath();
+        ctx.arc(this.x - 6, this.y - 4, 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(this.x + 6, this.y - 4, 2, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Draw special effects
+        if (this.special === 'fire') {
+            ctx.fillStyle = 'rgba(255, 165, 0, 0.5)';
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.width / 2 + 3, 0, Math.PI * 2);
+            ctx.fill();
         }
         
+        if (this.shieldHealth && this.shieldHealth > 0) {
+            ctx.strokeStyle = '#FFFF00';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.width / 2 + 8, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+        
+        // Draw health bar
         ctx.fillStyle = '#FF0000';
-        ctx.fillRect(this.x - this.width / 2, this.y - this.height / 2 - 8, this.width, 4);
+        ctx.fillRect(this.x - this.width / 2, this.y - this.height / 2 - 10, this.width, 3);
         ctx.fillStyle = '#00FF00';
         const healthPercent = this.health / this.maxHealth;
-        ctx.fillRect(this.x - this.width / 2, this.y - this.height / 2 - 8, this.width * healthPercent, 4);
+        ctx.fillRect(this.x - this.width / 2, this.y - this.height / 2 - 10, this.width * healthPercent, 3);
         
+        // Draw boss aura
         if (this.isBoss) {
-            ctx.strokeStyle = `rgba(255, 0, 0, 0.5)`;
+            ctx.strokeStyle = `rgba(255, 0, 0, ${0.3 + Math.sin(game.animationFrame * 0.05) * 0.2})`;
             ctx.lineWidth = 3;
             ctx.beginPath();
             ctx.arc(this.x, this.y, this.width / 2 + 15, 0, Math.PI * 2);
@@ -418,11 +538,12 @@ class Ally {
         this.vx = 0;
         this.vy = 0;
         this.attackCooldown = 0;
+        this.animationCounter = 0;
         
         const stats = {
-            swordmanAlly: { health: 80, minDamage: 8, maxDamage: 12, speed: 2, range: 40 },
-            archerAlly: { health: 60, minDamage: 6, maxDamage: 10, speed: 2, range: 150 },
-            healerAlly: { health: 50, minDamage: 0, maxDamage: 0, speed: 1.5, range: 200, healAmount: 8 }
+            swordmanAlly: { health: 80, minDamage: 8, maxDamage: 12, speed: 2, range: 40, color: '#00DD00' },
+            archerAlly: { health: 60, minDamage: 6, maxDamage: 10, speed: 2, range: 150, color: '#00FF88' },
+            healerAlly: { health: 50, minDamage: 0, maxDamage: 0, speed: 1.5, range: 200, healAmount: 8, color: '#00FFFF' }
         };
         
         const stat = stats[type] || stats.swordmanAlly;
@@ -433,6 +554,7 @@ class Ally {
         this.speed = stat.speed;
         this.range = stat.range;
         this.healAmount = stat.healAmount || 0;
+        this.color = stat.color;
         this.spawnTime = Date.now();
     }
     
@@ -482,6 +604,8 @@ class Ally {
             this.y = 50;
             this.spawnTime = Date.now();
         }
+        
+        this.animationCounter++;
     }
     
     attack(target) {
@@ -490,6 +614,13 @@ class Ally {
                 const dist = Math.hypot(ally.x - this.x, ally.y - this.y);
                 if (dist < this.range && ally !== this) {
                     ally.health = Math.min(ally.maxHealth, ally.health + this.healAmount);
+                    // Create heal particles
+                    for (let i = 0; i < 3; i++) {
+                        const angle = Math.random() * Math.PI * 2;
+                        const vx = Math.cos(angle);
+                        const vy = Math.sin(angle);
+                        game.particles.push(new Particle(ally.x, ally.y, vx, vy, '#00FF00', 20));
+                    }
                 }
             }
         } else {
@@ -507,13 +638,25 @@ class Ally {
         if (this.health <= 0) return;
         
         ctx.fillStyle = this.color;
-        ctx.fillRect(this.x - this.width / 2, this.y - this.height / 2, this.width, this.height);
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.width / 2, 0, Math.PI * 2);
+        ctx.fill();
         
+        // Draw eyes
+        ctx.fillStyle = '#000000';
+        ctx.beginPath();
+        ctx.arc(this.x - 5, this.y - 3, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(this.x + 5, this.y - 3, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Draw health bar
         ctx.fillStyle = '#FF0000';
-        ctx.fillRect(this.x - this.width / 2, this.y - this.height / 2 - 8, this.width, 4);
+        ctx.fillRect(this.x - this.width / 2, this.y - this.height / 2 - 10, this.width, 3);
         ctx.fillStyle = '#00FF00';
         const healthPercent = this.health / this.maxHealth;
-        ctx.fillRect(this.x - this.width / 2, this.y - this.height / 2 - 8, this.width * healthPercent, 4);
+        ctx.fillRect(this.x - this.width / 2, this.y - this.height / 2 - 10, this.width * healthPercent, 3);
     }
 }
 
@@ -526,6 +669,7 @@ class Tower {
         this.maxHealth = 1000;
         this.health = 1000;
         this.color = '#4CAF50';
+        this.animationCounter = 0;
     }
     
     takeDamage(amount) {
@@ -536,14 +680,47 @@ class Tower {
     }
     
     draw() {
+        // Draw tower base
         ctx.fillStyle = this.color;
         ctx.fillRect(this.x - this.width / 2, this.y - this.height / 2, this.width, this.height);
         
+        // Draw tower outline
+        ctx.strokeStyle = '#2E7D32';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(this.x - this.width / 2, this.y - this.height / 2, this.width, this.height);
+        
+        // Draw tower details
+        ctx.fillStyle = '#66BB6A';
+        ctx.fillRect(this.x - this.width / 4, this.y - this.height / 4, this.width / 2, this.height / 2);
+        
+        // Draw tower spikes
+        for (let i = 0; i < 4; i++) {
+            const angle = (Math.PI / 2) * i;
+            const px = this.x + Math.cos(angle) * (this.width / 2);
+            const py = this.y + Math.sin(angle) * (this.height / 2);
+            ctx.fillStyle = '#FFD700';
+            ctx.beginPath();
+            ctx.arc(px, py, 5, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        
+        // Draw health bar
         ctx.fillStyle = '#FF0000';
         ctx.fillRect(this.x - this.width / 2 - 40, this.y + this.height / 2 + 10, 120, 10);
         ctx.fillStyle = '#00FF00';
         const healthPercent = this.health / this.maxHealth;
         ctx.fillRect(this.x - this.width / 2 - 40, this.y + this.height / 2 + 10, 120 * healthPercent, 10);
+        
+        // Draw tower glow when low health
+        if (this.health < this.maxHealth * 0.3) {
+            ctx.strokeStyle = `rgba(255, 0, 0, ${0.3 + Math.sin(this.animationCounter * 0.05) * 0.2})`;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.width / 2 + 10, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+        
+        this.animationCounter++;
     }
 }
 
@@ -554,6 +731,7 @@ class StartButton {
         this.width = 80;
         this.height = 40;
         this.color = '#00FF00';
+        this.animationCounter = 0;
     }
     
     contains(x, y) {
@@ -562,22 +740,115 @@ class StartButton {
     }
     
     draw() {
+        // Draw button glow
+        ctx.fillStyle = `rgba(0, 255, 0, ${0.2 + Math.sin(this.animationCounter * 0.05) * 0.1})`;
+        ctx.fillRect(this.x - this.width / 2 - 5, this.y - this.height / 2 - 5, this.width + 10, this.height + 10);
+        
+        // Draw button
         ctx.fillStyle = this.color;
         ctx.fillRect(this.x - this.width / 2, this.y - this.height / 2, this.width, this.height);
+        
+        // Draw button border
+        ctx.strokeStyle = '#00AA00';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(this.x - this.width / 2, this.y - this.height / 2, this.width, this.height);
+        
+        // Draw text
         ctx.fillStyle = '#000000';
         ctx.font = 'bold 16px Arial';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText('START', this.x, this.y);
+        
+        this.animationCounter++;
+    }
+}
+
+// Map decorations
+class MapDecorations {
+    constructor() {
+        this.trees = this.generateTrees();
+        this.rocks = this.generateRocks();
+        this.grass = this.generateGrass();
+    }
+    
+    generateTrees() {
+        const trees = [];
+        for (let i = 0; i < 15; i++) {
+            trees.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                size: Math.random() * 20 + 15
+            });
+        }
+        return trees;
+    }
+    
+    generateRocks() {
+        const rocks = [];
+        for (let i = 0; i < 20; i++) {
+            rocks.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                size: Math.random() * 8 + 3
+            });
+        }
+        return rocks;
+    }
+    
+    generateGrass() {
+        const grass = [];
+        for (let i = 0; i < 100; i++) {
+            grass.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                size: Math.random() * 3 + 1
+            });
+        }
+        return grass;
+    }
+    
+    draw() {
+        // Draw grass
+        ctx.fillStyle = '#3d6b1f';
+        this.grass.forEach(g => {
+            ctx.fillRect(g.x, g.y, g.size, g.size);
+        });
+        
+        // Draw rocks
+        ctx.fillStyle = '#555555';
+        this.rocks.forEach(r => {
+            ctx.beginPath();
+            ctx.arc(r.x, r.y, r.size, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#333333';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        });
+        
+        // Draw trees
+        ctx.fillStyle = '#228B22';
+        this.trees.forEach(t => {
+            // Trunk
+            ctx.fillStyle = '#8B4513';
+            ctx.fillRect(t.x - 5, t.y, 10, t.size / 2);
+            // Leaves
+            ctx.fillStyle = '#228B22';
+            ctx.beginPath();
+            ctx.arc(t.x, t.y - t.size / 3, t.size / 2, 0, Math.PI * 2);
+            ctx.fill();
+        });
     }
 }
 
 let startButton = null;
+let mapDecorations = null;
 
 function initGame() {
     game.player = new Player(canvas.width / 2, canvas.height / 2);
     game.tower = new Tower(canvas.width / 2, canvas.height / 2);
     startButton = new StartButton(canvas.width / 2, canvas.height - 50);
+    mapDecorations = new MapDecorations();
     game.round = 0;
     game.coins = 0;
     game.gameStarted = false;
@@ -697,13 +968,28 @@ function update() {
         game.gameStarted = false;
     }
     
+    // Update particles
+    game.particles = game.particles.filter(p => {
+        p.update();
+        return p.life > 0;
+    });
+    
+    game.animationFrame++;
     updateUI();
 }
 
 function draw() {
-    ctx.fillStyle = '#2d5016';
+    // Draw gradient background
+    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    gradient.addColorStop(0, '#1a4d0a');
+    gradient.addColorStop(1, '#2d5016');
+    ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
+    // Draw map decorations
+    mapDecorations.draw();
+    
+    // Draw all game objects
     if (game.tower) game.tower.draw();
     
     if (startButton) startButton.draw();
@@ -714,17 +1000,20 @@ function draw() {
     
     game.allies.forEach(ally => ally.draw());
     
+    // Draw particles
+    game.particles.forEach(p => p.draw());
+    
     if (game.gameOver) {
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.fillStyle = '#FF0000';
-        ctx.font = 'bold 60px Arial';
+        ctx.font = 'bold 80px Arial';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2);
+        ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2 - 40);
         ctx.fillStyle = '#FFFFFF';
-        ctx.font = '30px Arial';
-        ctx.fillText('Tower Destroyed!', canvas.width / 2, canvas.height / 2 + 60);
+        ctx.font = '40px Arial';
+        ctx.fillText('Tower Destroyed!', canvas.width / 2, canvas.height / 2 + 40);
     }
 }
 
