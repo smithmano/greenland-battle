@@ -20,7 +20,7 @@ const game = {
     camera: { x: 0, y: 0 },
     enemySpawnQueue: [],
     enemySpawnTimer: 0,
-    enemySpawnInterval: 800, // Spawn an enemy every 800ms
+    enemySpawnInterval: 300, // Spawn an enemy every 300ms
     
     upgrades: {
         maxHealthLevel: 1,
@@ -89,11 +89,6 @@ const game = {
             if (game.coins >= nextCost) {
                 game.coins -= nextCost;
                 this.unlockedAllies[allyType]++;
-                
-                // Spawn the ally at the top middle of the canvas
-                const ally = new Ally(canvas.width / 2, 50, allyType);
-                game.allies.push(ally);
-                
                 updateUI();
             }
         }
@@ -554,13 +549,12 @@ class Ally {
         this.type = type;
         this.width = 25;
         this.height = 25;
-        this.color = '#00AAFF';
+        this.color = '#00FF00';
         this.vx = 0;
         this.vy = 0;
         this.attackCooldown = 0;
         this.floatOffset = 0;
         this.floatDirection = 1;
-        this.isAlive = true;
         
         const stats = {
             swordmanAlly: { health: 80, minDamage: 8, maxDamage: 12, speed: 2, range: 40 },
@@ -580,8 +574,6 @@ class Ally {
     }
     
     update() {
-        if (!this.isAlive) return;
-        
         // Floating animation
         this.floatOffset += 0.04 * this.floatDirection;
         if (this.floatOffset > 2 || this.floatOffset < -2) {
@@ -590,11 +582,7 @@ class Ally {
         
         const enemies = game.enemies;
         
-        if (enemies.length === 0) {
-            this.vx = 0;
-            this.vy = 0;
-            return;
-        }
+        if (enemies.length === 0) return;
         
         let target = enemies[0];
         let minDist = Math.hypot(target.x - this.x, target.y - this.y);
@@ -627,19 +615,14 @@ class Ally {
         this.x += this.vx;
         this.y += this.vy;
         
-        // Keep allies on screen
-        this.x = Math.max(0, Math.min(this.x, canvas.width));
-        this.y = Math.max(0, Math.min(this.y, canvas.height));
-        
         if (this.attackCooldown > 0) {
             this.attackCooldown -= 16;
         }
         
-        // Respawn if dead after 30 seconds
         if (this.health <= 0 && Date.now() - this.spawnTime > 30000) {
             this.health = this.maxHealth;
             this.x = canvas.width / 2;
-            this.y = 50;
+            this.y = canvas.height / 2;
             this.spawnTime = Date.now();
         }
     }
@@ -648,7 +631,7 @@ class Ally {
         if (this.healAmount > 0) {
             for (let ally of game.allies) {
                 const dist = Math.hypot(ally.x - this.x, ally.y - this.y);
-                if (dist < this.range && ally !== this && ally.health < ally.maxHealth) {
+                if (dist < this.range && ally !== this) {
                     ally.health = Math.min(ally.maxHealth, ally.health + this.healAmount);
                     
                     // Heal particles
@@ -675,13 +658,6 @@ class Ally {
     
     takeDamage(amount) {
         this.health -= amount;
-        if (this.health <= 0) {
-            this.die();
-        }
-    }
-    
-    die() {
-        this.isAlive = false;
     }
     
     draw() {
@@ -749,8 +725,8 @@ class StartButton {
     constructor(x, y) {
         this.x = x;
         this.y = y;
-        this.width = 80;
-        this.height = 40;
+        this.width = 200;
+        this.height = 80;
         this.color = '#00FF00';
         this.hoverScale = 1;
     }
@@ -766,11 +742,11 @@ class StartButton {
         
         // Border
         ctx.strokeStyle = '#FFFFFF';
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 4;
         ctx.strokeRect(this.x - this.width / 2, this.y - this.height / 2, this.width, this.height);
         
         ctx.fillStyle = '#000000';
-        ctx.font = 'bold 16px Arial';
+        ctx.font = 'bold 40px Arial';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText('START', this.x, this.y);
@@ -782,7 +758,7 @@ let startButton = null;
 function initGame() {
     game.player = new Player(canvas.width / 2, canvas.height / 2);
     game.tower = new Tower(canvas.width / 2, canvas.height / 2);
-    startButton = new StartButton(canvas.width / 2, canvas.height - 50);
+    startButton = new StartButton(canvas.width / 2, canvas.height - 100);
     game.round = 0;
     game.coins = 0;
     game.gameStarted = false;
@@ -866,11 +842,6 @@ function updateUI() {
     document.getElementById('maxHealthLevel').textContent = `Lv.${game.upgrades.maxHealthLevel}`;
     document.getElementById('meleeDamageLevel').textContent = `Lv.${game.upgrades.meleeDamageLevel}`;
     document.getElementById('rangedDamageLevel').textContent = `Lv.${game.upgrades.rangedDamageLevel}`;
-    
-    // Update ally level displays
-    document.getElementById('swordmanAllyLevel').textContent = `Lv.${game.upgradeManager.unlockedAllies.swordmanAlly || 0}`;
-    document.getElementById('archerAllyLevel').textContent = `Lv.${game.upgradeManager.unlockedAllies.archerAlly || 0}`;
-    document.getElementById('healerAllyLevel').textContent = `Lv.${game.upgradeManager.unlockedAllies.healerAlly || 0}`;
 }
 
 function updateWeaponButtons() {
@@ -923,12 +894,9 @@ function update() {
             return true;
         });
         
-        // Clean up dead allies
-        game.allies = game.allies.filter(ally => ally.health > 0 || Date.now() - ally.spawnTime <= 30000);
-        
         if (game.enemies.length === 0 && game.gameStarted && game.enemySpawnQueue.length === 0) {
             game.gameStarted = false;
-            startButton = new StartButton(canvas.width / 2, canvas.height - 50);
+            startButton = new StartButton(canvas.width / 2, canvas.height - 100);
         }
     }
     
@@ -1002,8 +970,10 @@ window.addEventListener('keyup', (e) => {
 
 canvas.addEventListener('click', (e) => {
     const rect = canvas.getBoundingClientRect();
-    const x = (e.clientX - rect.left) * 2;
-    const y = (e.clientY - rect.top) * 2;
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
     
     if (startButton && startButton.contains(x, y)) {
         startRound();
