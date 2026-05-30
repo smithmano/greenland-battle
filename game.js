@@ -970,8 +970,8 @@ window.addEventListener('keyup', (e) => {
 
 canvas.addEventListener('click', (e) => {
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const x = (e.clientX - rect.left) * 2;
+    const y = (e.clientY - rect.top) * 2;
     
     if (startButton && startButton.contains(x, y)) {
         startRound();
