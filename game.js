@@ -20,7 +20,7 @@ const game = {
     camera: { x: 0, y: 0 },
     enemySpawnQueue: [],
     enemySpawnTimer: 0,
-    enemySpawnInterval: 300, // Spawn an enemy every 300ms
+    enemySpawnInterval: 800, // Spawn an enemy every 800ms
     
     upgrades: {
         maxHealthLevel: 1,
