@@ -103,6 +103,36 @@ const game = {
     }
 };
 
+class Particle {
+    constructor(x, y, vx, vy, color, life = 1000) {
+        this.x = x;
+        this.y = y;
+        this.vx = vx;
+        this.vy = vy;
+        this.color = color;
+        this.life = life;
+        this.maxLife = life;
+        this.size = Math.random() * 3 + 2;
+    }
+    
+    update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.vy += 0.1; // gravity
+        this.life -= 16;
+    }
+    
+    draw() {
+        const alpha = this.life / this.maxLife;
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+    }
+}
+
 class Player {
     constructor(x, y) {
         this.x = x;
@@ -126,6 +156,10 @@ class Player {
         this.attackCooldown = 0;
         this.attackRange = 40;
         this.currentWeapon = 'sword';
+        this.kills = 0;
+        this.level = 1;
+        this.exp = 0;
+        this.expNeeded = 100;
     }
     
     update() {
@@ -174,6 +208,20 @@ class Player {
         this.isRed = true;
         this.redTimer = 100;
         
+        // Create damage particles
+        for (let i = 0; i < 5; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = Math.random() * 2 + 1;
+            game.particles.push(new Particle(
+                this.x,
+                this.y,
+                Math.cos(angle) * speed,
+                Math.sin(angle) * speed,
+                '#FF0000',
+                600
+            ));
+        }
+        
         if (this.health <= 0) {
             this.die();
         }
@@ -191,16 +239,60 @@ class Player {
         this.y = canvas.height / 2;
     }
     
+    gainExp(amount) {
+        this.exp += amount;
+        if (this.exp >= this.expNeeded) {
+            this.levelUp();
+        }
+    }
+    
+    levelUp() {
+        this.level++;
+        this.exp -= this.expNeeded;
+        this.expNeeded = Math.floor(this.expNeeded * 1.1);
+        this.maxHealth += 10;
+        this.health = this.maxHealth;
+        this.speed += 0.5;
+        
+        // Level up particles
+        for (let i = 0; i < 15; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = Math.random() * 3 + 2;
+            game.particles.push(new Particle(
+                this.x,
+                this.y,
+                Math.cos(angle) * speed,
+                Math.sin(angle) * speed,
+                '#FFD700',
+                800
+            ));
+        }
+    }
+    
     draw() {
         const color = this.isRed ? this.damageColor : this.color;
         ctx.fillStyle = color;
         ctx.fillRect(this.x - this.width / 2, this.y - this.height / 2, this.width, this.height);
         
+        // Draw level indicator
+        ctx.fillStyle = '#FFD700';
+        ctx.font = 'bold 12px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(`Lv${this.level}`, this.x, this.y - this.height / 2 - 15);
+        
+        // Health bar
         ctx.fillStyle = '#FF0000';
         ctx.fillRect(this.x - this.width / 2, this.y - this.height / 2 - 10, this.width, 5);
         ctx.fillStyle = '#00FF00';
         const healthPercent = this.health / this.maxHealth;
         ctx.fillRect(this.x - this.width / 2, this.y - this.height / 2 - 10, this.width * healthPercent, 5);
+        
+        // EXP bar
+        ctx.fillStyle = '#333333';
+        ctx.fillRect(this.x - this.width / 2, this.y - this.height / 2 - 4, this.width, 2);
+        ctx.fillStyle = '#00FFFF';
+        const expPercent = this.exp / this.expNeeded;
+        ctx.fillRect(this.x - this.width / 2, this.y - this.height / 2 - 4, this.width * expPercent, 2);
     }
     
     attack(enemies) {
@@ -258,6 +350,8 @@ class Enemy {
         this.attackCooldown = 0;
         this.isBoss = false;
         this.auraAlpha = 0;
+        this.floatOffset = 0;
+        this.floatDirection = 1;
         
         this.initializeStats();
     }
@@ -308,6 +402,12 @@ class Enemy {
     }
     
     update() {
+        // Floating animation
+        this.floatOffset += 0.05 * this.floatDirection;
+        if (this.floatOffset > 3 || this.floatOffset < -3) {
+            this.floatDirection *= -1;
+        }
+        
         const target = game.player;
         
         if (!target || target.isDead) {
@@ -374,6 +474,20 @@ class Enemy {
             this.health -= amount;
         }
         
+        // Damage particles
+        for (let i = 0; i < 3; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = Math.random() * 1.5 + 0.5;
+            game.particles.push(new Particle(
+                this.x,
+                this.y,
+                Math.cos(angle) * speed,
+                Math.sin(angle) * speed,
+                '#FFAA00',
+                400
+            ));
+        }
+        
         if (this.health <= 0) {
             this.die();
         }
@@ -381,30 +495,48 @@ class Enemy {
     
     die() {
         game.coins += 10;
+        game.player.gainExp(20);
+        
+        // Death particles
+        for (let i = 0; i < 8; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = Math.random() * 3 + 1;
+            game.particles.push(new Particle(
+                this.x,
+                this.y,
+                Math.cos(angle) * speed,
+                Math.sin(angle) * speed,
+                '#FF4444',
+                600
+            ));
+        }
+        
         game.enemies = game.enemies.filter(e => e !== this);
     }
     
     draw() {
         ctx.fillStyle = this.color;
-        ctx.fillRect(this.x - this.width / 2, this.y - this.height / 2, this.width, this.height);
+        ctx.fillRect(this.x - this.width / 2, this.y - this.height / 2 + this.floatOffset, this.width, this.height);
         
         if (this.shieldHealth && this.shieldHealth > 0) {
             ctx.fillStyle = '#FFFF00';
             const shieldPercent = this.shieldHealth / this.maxShieldHealth;
-            ctx.fillRect(this.x - this.width / 2, this.y - this.height / 2 - 15, this.width * shieldPercent, 3);
+            ctx.fillRect(this.x - this.width / 2, this.y - this.height / 2 + this.floatOffset - 15, this.width * shieldPercent, 3);
         }
         
+        // Health bar
         ctx.fillStyle = '#FF0000';
-        ctx.fillRect(this.x - this.width / 2, this.y - this.height / 2 - 8, this.width, 4);
+        ctx.fillRect(this.x - this.width / 2, this.y - this.height / 2 + this.floatOffset - 8, this.width, 4);
         ctx.fillStyle = '#00FF00';
         const healthPercent = this.health / this.maxHealth;
-        ctx.fillRect(this.x - this.width / 2, this.y - this.height / 2 - 8, this.width * healthPercent, 4);
+        ctx.fillRect(this.x - this.width / 2, this.y - this.height / 2 + this.floatOffset - 8, this.width * healthPercent, 4);
         
+        // Boss aura
         if (this.isBoss) {
-            ctx.strokeStyle = `rgba(255, 0, 0, 0.5)`;
+            ctx.strokeStyle = `rgba(255, 100, 0, 0.6)`;
             ctx.lineWidth = 3;
             ctx.beginPath();
-            ctx.arc(this.x, this.y, this.width / 2 + 15, 0, Math.PI * 2);
+            ctx.arc(this.x, this.y + this.floatOffset, this.width / 2 + 15, 0, Math.PI * 2);
             ctx.stroke();
         }
     }
@@ -421,6 +553,8 @@ class Ally {
         this.vx = 0;
         this.vy = 0;
         this.attackCooldown = 0;
+        this.floatOffset = 0;
+        this.floatDirection = 1;
         
         const stats = {
             swordmanAlly: { health: 80, minDamage: 8, maxDamage: 12, speed: 2, range: 40 },
@@ -440,6 +574,12 @@ class Ally {
     }
     
     update() {
+        // Floating animation
+        this.floatOffset += 0.04 * this.floatDirection;
+        if (this.floatOffset > 2 || this.floatOffset < -2) {
+            this.floatDirection *= -1;
+        }
+        
         const enemies = game.enemies;
         
         if (enemies.length === 0) return;
@@ -493,6 +633,20 @@ class Ally {
                 const dist = Math.hypot(ally.x - this.x, ally.y - this.y);
                 if (dist < this.range && ally !== this) {
                     ally.health = Math.min(ally.maxHealth, ally.health + this.healAmount);
+                    
+                    // Heal particles
+                    for (let i = 0; i < 3; i++) {
+                        const angle = Math.random() * Math.PI * 2;
+                        const speed = Math.random() * 1.5 + 0.5;
+                        game.particles.push(new Particle(
+                            ally.x,
+                            ally.y,
+                            Math.cos(angle) * speed,
+                            Math.sin(angle) * speed,
+                            '#00FF00',
+                            500
+                        ));
+                    }
                 }
             }
         } else {
@@ -510,13 +664,14 @@ class Ally {
         if (this.health <= 0) return;
         
         ctx.fillStyle = this.color;
-        ctx.fillRect(this.x - this.width / 2, this.y - this.height / 2, this.width, this.height);
+        ctx.fillRect(this.x - this.width / 2, this.y - this.height / 2 + this.floatOffset, this.width, this.height);
         
+        // Health bar
         ctx.fillStyle = '#FF0000';
-        ctx.fillRect(this.x - this.width / 2, this.y - this.height / 2 - 8, this.width, 4);
+        ctx.fillRect(this.x - this.width / 2, this.y - this.height / 2 + this.floatOffset - 8, this.width, 4);
         ctx.fillStyle = '#00FF00';
         const healthPercent = this.health / this.maxHealth;
-        ctx.fillRect(this.x - this.width / 2, this.y - this.height / 2 - 8, this.width * healthPercent, 4);
+        ctx.fillRect(this.x - this.width / 2, this.y - this.height / 2 + this.floatOffset - 8, this.width * healthPercent, 4);
     }
 }
 
@@ -529,6 +684,7 @@ class Tower {
         this.maxHealth = 1000;
         this.health = 1000;
         this.color = '#4CAF50';
+        this.rotationAngle = 0;
     }
     
     takeDamage(amount) {
@@ -538,10 +694,25 @@ class Tower {
         }
     }
     
+    update() {
+        this.rotationAngle += 0.02;
+    }
+    
     draw() {
-        ctx.fillStyle = this.color;
-        ctx.fillRect(this.x - this.width / 2, this.y - this.height / 2, this.width, this.height);
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.rotationAngle);
         
+        ctx.fillStyle = this.color;
+        ctx.fillRect(-this.width / 2, -this.height / 2, this.width, this.height);
+        
+        // Highlight
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.fillRect(-this.width / 2, -this.height / 2, this.width / 2, this.height / 2);
+        
+        ctx.restore();
+        
+        // Health bar
         ctx.fillStyle = '#FF0000';
         ctx.fillRect(this.x - this.width / 2 - 40, this.y + this.height / 2 + 10, 120, 10);
         ctx.fillStyle = '#00FF00';
@@ -557,6 +728,7 @@ class StartButton {
         this.width = 80;
         this.height = 40;
         this.color = '#00FF00';
+        this.hoverScale = 1;
     }
     
     contains(x, y) {
@@ -567,6 +739,12 @@ class StartButton {
     draw() {
         ctx.fillStyle = this.color;
         ctx.fillRect(this.x - this.width / 2, this.y - this.height / 2, this.width, this.height);
+        
+        // Border
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(this.x - this.width / 2, this.y - this.height / 2, this.width, this.height);
+        
         ctx.fillStyle = '#000000';
         ctx.font = 'bold 16px Arial';
         ctx.textAlign = 'center';
@@ -587,6 +765,7 @@ function initGame() {
     game.gameOver = false;
     game.enemies = [];
     game.allies = [];
+    game.particles = [];
     game.enemySpawnQueue = [];
     game.enemySpawnTimer = 0;
 }
@@ -692,9 +871,14 @@ function update() {
         
         game.player.update();
         game.player.attack(game.enemies);
+        game.tower.update();
         
         game.enemies.forEach(enemy => enemy.update());
         game.allies.forEach(ally => ally.update());
+        
+        // Update and clean particles
+        game.particles = game.particles.filter(p => p.life > 0);
+        game.particles.forEach(p => p.update());
         
         game.enemies = game.enemies.filter(enemy => {
             const dist = Math.hypot(enemy.x - game.tower.x, enemy.y - game.tower.y);
@@ -727,6 +911,22 @@ function draw() {
     ctx.fillStyle = '#2d5016';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
+    // Draw grid background
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < canvas.width; i += 100) {
+        ctx.beginPath();
+        ctx.moveTo(i, 0);
+        ctx.lineTo(i, canvas.height);
+        ctx.stroke();
+    }
+    for (let i = 0; i < canvas.height; i += 100) {
+        ctx.beginPath();
+        ctx.moveTo(0, i);
+        ctx.lineTo(canvas.width, i);
+        ctx.stroke();
+    }
+    
     if (game.tower) game.tower.draw();
     
     if (startButton) startButton.draw();
@@ -736,6 +936,9 @@ function draw() {
     game.enemies.forEach(enemy => enemy.draw());
     
     game.allies.forEach(ally => ally.draw());
+    
+    // Draw particles
+    game.particles.forEach(p => p.draw());
     
     if (game.gameOver) {
         ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
