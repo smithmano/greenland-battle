@@ -89,6 +89,11 @@ const game = {
             if (game.coins >= nextCost) {
                 game.coins -= nextCost;
                 this.unlockedAllies[allyType]++;
+                
+                // Spawn the ally at the top middle of the canvas
+                const ally = new Ally(canvas.width / 2, 50, allyType);
+                game.allies.push(ally);
+                
                 updateUI();
             }
         }
@@ -549,12 +554,13 @@ class Ally {
         this.type = type;
         this.width = 25;
         this.height = 25;
-        this.color = '#00FF00';
+        this.color = '#00AAFF';
         this.vx = 0;
         this.vy = 0;
         this.attackCooldown = 0;
         this.floatOffset = 0;
         this.floatDirection = 1;
+        this.isAlive = true;
         
         const stats = {
             swordmanAlly: { health: 80, minDamage: 8, maxDamage: 12, speed: 2, range: 40 },
@@ -574,6 +580,8 @@ class Ally {
     }
     
     update() {
+        if (!this.isAlive) return;
+        
         // Floating animation
         this.floatOffset += 0.04 * this.floatDirection;
         if (this.floatOffset > 2 || this.floatOffset < -2) {
@@ -582,7 +590,11 @@ class Ally {
         
         const enemies = game.enemies;
         
-        if (enemies.length === 0) return;
+        if (enemies.length === 0) {
+            this.vx = 0;
+            this.vy = 0;
+            return;
+        }
         
         let target = enemies[0];
         let minDist = Math.hypot(target.x - this.x, target.y - this.y);
@@ -615,14 +627,19 @@ class Ally {
         this.x += this.vx;
         this.y += this.vy;
         
+        // Keep allies on screen
+        this.x = Math.max(0, Math.min(this.x, canvas.width));
+        this.y = Math.max(0, Math.min(this.y, canvas.height));
+        
         if (this.attackCooldown > 0) {
             this.attackCooldown -= 16;
         }
         
+        // Respawn if dead after 30 seconds
         if (this.health <= 0 && Date.now() - this.spawnTime > 30000) {
             this.health = this.maxHealth;
             this.x = canvas.width / 2;
-            this.y = canvas.height / 2;
+            this.y = 50;
             this.spawnTime = Date.now();
         }
     }
@@ -631,7 +648,7 @@ class Ally {
         if (this.healAmount > 0) {
             for (let ally of game.allies) {
                 const dist = Math.hypot(ally.x - this.x, ally.y - this.y);
-                if (dist < this.range && ally !== this) {
+                if (dist < this.range && ally !== this && ally.health < ally.maxHealth) {
                     ally.health = Math.min(ally.maxHealth, ally.health + this.healAmount);
                     
                     // Heal particles
@@ -658,6 +675,13 @@ class Ally {
     
     takeDamage(amount) {
         this.health -= amount;
+        if (this.health <= 0) {
+            this.die();
+        }
+    }
+    
+    die() {
+        this.isAlive = false;
     }
     
     draw() {
@@ -842,6 +866,11 @@ function updateUI() {
     document.getElementById('maxHealthLevel').textContent = `Lv.${game.upgrades.maxHealthLevel}`;
     document.getElementById('meleeDamageLevel').textContent = `Lv.${game.upgrades.meleeDamageLevel}`;
     document.getElementById('rangedDamageLevel').textContent = `Lv.${game.upgrades.rangedDamageLevel}`;
+    
+    // Update ally level displays
+    document.getElementById('swordmanAllyLevel').textContent = `Lv.${game.upgradeManager.unlockedAllies.swordmanAlly || 0}`;
+    document.getElementById('archerAllyLevel').textContent = `Lv.${game.upgradeManager.unlockedAllies.archerAlly || 0}`;
+    document.getElementById('healerAllyLevel').textContent = `Lv.${game.upgradeManager.unlockedAllies.healerAlly || 0}`;
 }
 
 function updateWeaponButtons() {
@@ -893,6 +922,9 @@ function update() {
             }
             return true;
         });
+        
+        // Clean up dead allies
+        game.allies = game.allies.filter(ally => ally.health > 0 || Date.now() - ally.spawnTime <= 30000);
         
         if (game.enemies.length === 0 && game.gameStarted && game.enemySpawnQueue.length === 0) {
             game.gameStarted = false;
